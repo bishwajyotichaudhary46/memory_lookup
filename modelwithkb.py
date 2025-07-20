@@ -16,8 +16,6 @@ class EncoderDecoderWithKBAttention(nn.Module):
 
         # Attention over KB keys (commented out, unused)
         self.W_kb1 = nn.Linear(hidden_dim * 2, embedding_dim)
-        self.W_kb2 = nn.Linear(hidden_dim, hidden_dim)
-        self.r = nn.Linear(hidden_dim, 1)
 
         # Final vocab projection
         self.U = nn.Linear(hidden_dim * 4, vocab_size)
@@ -40,19 +38,22 @@ class EncoderDecoderWithKBAttention(nn.Module):
     
 
     
-    def kb_attention(self, decoder_hidden, kb_keys, key_idx_2_token_id):
+    def kb_attention(self, decoder_hidden, kb_keys, new2old):
         B, _ = decoder_hidden.shape # (B,H)
         x = torch.tanh(self.W_kb1(decoder_hidden))  #(B, E)
+       
         x_norm = F.normalize(x, p=2, dim=1)              #(B, E)
-
-        kb_key_norm = F.normalize(x_norm, p=2, dim=2)    #(N, E)
+        kb_key_norm = F.normalize(kb_keys, p=2, dim=1)    #(N, E)
+       
 
         # similarity
         cosine_sim = torch.matmul(x_norm, kb_key_norm.T)  #(B, N)
+        cosine_sim = cosine_sim.squeeze(0)
+        
+        kb_atten_score_dict = {new2old[idx]:sim for idx, sim in enumerate(cosine_sim)} #(token_id, similarity)
+   
+        kb_attention = torch.zeros(B, self.vocab_size).to('cuda')
 
-        kb_atten_score_dict = {key_idx_2_token_id[idx]:sim for idx, sim in enumerate(cosine_sim)} #(token_id, similarity)
-
-        kb_attention = torch.zeros(B, self.vocab_size)
 
         for idx, val in kb_atten_score_dict.items():
             kb_attention[:, idx] += val
@@ -62,7 +63,7 @@ class EncoderDecoderWithKBAttention(nn.Module):
     
 
 
-    def forward(self, inputs, targets,key_idx_2_token_id, teacher_forcing_ratio=1.0, kb_keys=None, fine_tune=False):
+    def forward(self, inputs, targets, kb_keys, new2old, teacher_forcing_ratio=1.0):
     
 
         batch_size, T_out, _ = targets.shape
@@ -73,18 +74,22 @@ class EncoderDecoderWithKBAttention(nn.Module):
 
         logits = []
 
-        dec_input = targets[:, 0, :]  # Initial decoder input (usually <sos> embedding)
+        dec_input = targets[:, 0, :]  
 
         for t in range(1, T_out):
             hidden_state, cell_state = self.decoder(dec_input, (hidden, cell))
             hidden = hidden_state
             cell = cell_state
+        
+         
 
             hidden_logits = self.decoder_attention(hidden_state, enc_out)
-            if kb_keys:
-                kb_attention_logits = self.kb_attention(hidden_state, kb_keys, key_idx_2_token_id)
-                hidden_logits = kb_attention_logits + hidden_logits
-
+            
+            kb_attention_logits = self.kb_attention(hidden_state, kb_keys, new2old).to('cuda')
+            #print(kb_attention_logits.shape)
+            hidden_logits = kb_attention_logits + hidden_logits
+            #print(kb_attention_logits.shape)
+       
             logits.append(hidden_logits)
 
             # Decide whether to do teacher forcing this step

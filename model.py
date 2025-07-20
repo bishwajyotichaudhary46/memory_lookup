@@ -13,10 +13,6 @@ class EncoderDecoderWithKBAttention(nn.Module):
         self.W_denc2 = nn.Linear(hidden_dim, hidden_dim)
         self.w = nn.Linear(hidden_dim, 1)
 
-        # Attention over KB keys (commented out, unused)
-        # self.W_kb1 = nn.Linear(hidden_dim + embedding_dim, hidden_dim)
-        # self.W_kb2 = nn.Linear(hidden_dim, hidden_dim)
-        # self.r = nn.Linear(hidden_dim, 1)
 
         # Final vocab projection
         self.U = nn.Linear(hidden_dim * 4, vocab_size)
