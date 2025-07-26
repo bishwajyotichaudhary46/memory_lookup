@@ -46,7 +46,7 @@ def generate_qa(data):
 qa_pairs = generate_qa(data)
 
 # Extend data to reach 2000 Q/A pairs
-qa_pairs_extended = qa_pairs * 400  # This will give you exactly 2000 Q/A pairs
+qa_pairs_extended = qa_pairs * 10  # This will give you exactly 2000 Q/A pairs
 
 # Save to JSON file
 with open('qa_pairs.json', 'w') as file:
