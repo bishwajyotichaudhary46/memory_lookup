@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 
-class EncoderDecoderWithKBAttention(nn.Module):
+class EncoderDecoderAttention(nn.Module):
     def __init__(self, embed_model, vocab_size, hidden_dim, embedding_dim=1024):
         super().__init__()
         self.embed_model = embed_model
@@ -69,3 +69,6 @@ class EncoderDecoderWithKBAttention(nn.Module):
                     dec_input = self.embed_model(pred_tokens)['last_hidden_state'][:, 0, :]
 
         return torch.stack(logits, dim=1)  # (B, T_out-1, vocab_size)
+
+
+

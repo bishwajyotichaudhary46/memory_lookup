@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class EncoderDecoderWithKBAttention(nn.Module):
-    def __init__(self, embed_model, vocab_size, hidden_dim, embedding_dim=1024):
+    def __init__(self, embed_model, vocab_size, hidden_dim, new2old, embedding_dim=1024):
         super().__init__()
         self.embed_model = embed_model
         self.encoder = nn.LSTM(embedding_dim, hidden_dim, dropout=0.2, batch_first=True, bidirectional=True)
@@ -14,13 +14,17 @@ class EncoderDecoderWithKBAttention(nn.Module):
         self.W_denc2 = nn.Linear(hidden_dim, hidden_dim)
         self.w = nn.Linear(hidden_dim, 1)
 
-        # Attention over KB keys (commented out, unused)
+        # Attention over KB keys 
         self.W_kb1 = nn.Linear(hidden_dim * 2, embedding_dim)
 
         # Final vocab projection
         self.U = nn.Linear(hidden_dim * 4, vocab_size)
-
+        
+        # get vocab size
         self.vocab_size = vocab_size
+
+        # keys to tokenid
+        self.new2old = new2old
 
     def decoder_attention(self, decoder_hidden, encoder_hidden):
         B, T, H = encoder_hidden.shape                               # B=batch, T=encoder seq len, H=hidden size
@@ -38,7 +42,7 @@ class EncoderDecoderWithKBAttention(nn.Module):
     
 
     
-    def kb_attention(self, decoder_hidden, kb_keys, new2old):
+    def kb_attention(self, decoder_hidden, kb_keys):
         B, _ = decoder_hidden.shape # (B,H)
         x = torch.tanh(self.W_kb1(decoder_hidden))  #(B, E)
        
@@ -50,7 +54,7 @@ class EncoderDecoderWithKBAttention(nn.Module):
         cosine_sim = torch.matmul(x_norm, kb_key_norm.T)  #(B, N)
         cosine_sim = cosine_sim.squeeze(0)
         
-        kb_atten_score_dict = {new2old[idx]:sim for idx, sim in enumerate(cosine_sim)} #(token_id, similarity)
+        kb_atten_score_dict = {self.new2old[str(idx)]:sim for idx, sim in enumerate(cosine_sim)} #(token_id, similarity)
    
         kb_attention = torch.zeros(B, self.vocab_size).to('cuda')
 
@@ -63,10 +67,10 @@ class EncoderDecoderWithKBAttention(nn.Module):
     
 
 
-    def forward(self, inputs, targets, kb_keys, new2old, teacher_forcing_ratio=1.0):
+    def forward(self, inputs, targets, kb_keys, teacher_forcing_ratio=1.0):
     
 
-        batch_size, T_out, _ = targets.shape
+        n_t = len(targets)
 
         enc_out, (h_enc, c_enc) = self.encoder(inputs)  # enc_out: (B, T_in, H)
         hidden = torch.cat([h_enc[0], h_enc[-1]], dim=-1)  # (B, hidden_dim*2)
@@ -74,18 +78,19 @@ class EncoderDecoderWithKBAttention(nn.Module):
 
         logits = []
 
-        dec_input = targets[:, 0, :]  
+        dec_input = targets[0][0]  
 
-        for t in range(1, T_out):
+        for t in range(1, n_t):
+
+            
             hidden_state, cell_state = self.decoder(dec_input, (hidden, cell))
             hidden = hidden_state
             cell = cell_state
         
-         
-
+            
             hidden_logits = self.decoder_attention(hidden_state, enc_out)
             
-            kb_attention_logits = self.kb_attention(hidden_state, kb_keys, new2old).to('cuda')
+            kb_attention_logits = self.kb_attention(hidden_state, kb_keys).to('cuda')
             #print(kb_attention_logits.shape)
             hidden_logits = kb_attention_logits + hidden_logits
             #print(kb_attention_logits.shape)
@@ -97,13 +102,13 @@ class EncoderDecoderWithKBAttention(nn.Module):
 
             if use_teacher_forcing:
                 # Use ground-truth target embedding for next input
-                dec_input = targets[:, t, :]
+                dec_input = targets[t][0]
             else:
                 # Use model prediction:
                 pred_tokens = torch.argmax(hidden_logits, dim=1)  # (B,)
                 with torch.no_grad():
                     # Get embeddings for predicted tokens
                     # Assuming embed_model accepts token IDs and returns embeddings
-                    dec_input = self.embed_model(pred_tokens)['last_hidden_state'][:, 0, :]
+                    dec_input = self.embed_model(pred_tokens.unsqueeze(0))['last_hidden_state'][0].detach()
 
         return torch.stack(logits, dim=1)  # (B, T_out-1, vocab_size)

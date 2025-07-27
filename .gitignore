@@ -3,3 +3,5 @@ kv_env
 .json
 models
 new_models
+encoder_decoder_attention_model
+artifacts
