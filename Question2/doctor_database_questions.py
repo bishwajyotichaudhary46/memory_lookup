@@ -4,14 +4,14 @@ with open('appointments_data.json', 'r') as f:
     raw_data = json.load(f)
 
 
-# Function to convert raw data into structured format
+# function to convert raw data into structured format
 def transform_data(raw_data):
     transformed_data = []
 
-    # Extracting each patient's data
+    # extracting each patient's data
     for key in raw_data:
         if "_doctor" in key:
-            # Extracting the name of the person
+            # extracting the name of the person
             name = key.split("_")[0]
             doctor = raw_data.get(f"{name}_doctor")
             appointment_date = raw_data.get(f"{name}_appointment_date")
@@ -20,7 +20,7 @@ def transform_data(raw_data):
             contact = raw_data.get(f"{name}_contact")
             appointment_time = raw_data.get(f"{name}_appointment_time")
 
-            # Creating a dictionary for each patient
+            # creating a dictionary for each patient
             patient_data = {
                 "name": name,
                 "doctor": doctor,
@@ -30,17 +30,17 @@ def transform_data(raw_data):
                 "contact": contact
             }
             
-            # Adding the structured data to the result
+            # adding the structured data to the result
             transformed_data.append(patient_data)
     
     return transformed_data
 
-# Transform the raw data into a list of dictionaries
+# transform the raw data into a list of dictionaries
 formatted_data = transform_data(raw_data)
 
-# Save the output as a new JSON file
+# save the output as a new JSON file
 with open('formatted_appointments.json', 'w') as output_file:
     json.dump(formatted_data, output_file, indent=4)
 
-# Print the formatted data to verify
+# print the formatted data to verify
 print(json.dumps(formatted_data, indent=4))

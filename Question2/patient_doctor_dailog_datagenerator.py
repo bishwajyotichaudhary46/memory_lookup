@@ -1,10 +1,11 @@
 import random
 import json
 
+# open json file in read mode and load into data
 with open('formatted_appointments.json', 'r') as f:
     data = json.load(f)
 
-# Function to generate Q/A pairs for each user
+# function to generate Q/A pairs for each user
 def generate_qa(data):
     qa_pairs = []
     
@@ -38,17 +39,17 @@ def generate_qa(data):
             "answer": f"The contact number for {name} is {contact}."
         })
     
-    # Shuffle the Q/A pairs for more variability
+    # shuffle the Q/A pairs for more variability
     random.shuffle(qa_pairs)
     return qa_pairs
 
-# Generate the Q/A pairs
+# generate the Q/A pairs
 qa_pairs = generate_qa(data)
 
-# Extend data to reach 2000 Q/A pairs
-qa_pairs_extended = qa_pairs * 10  # This will give you exactly 2000 Q/A pairs
+# extend data into 10 times
+qa_pairs_extended = qa_pairs * 10  
 
-# Save to JSON file
+# save to JSON file
 with open('qa_pairs.json', 'w') as file:
     json.dump({"Q&A": qa_pairs_extended}, file, indent=4)
 
